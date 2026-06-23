@@ -243,3 +243,55 @@ Ini setara komponen `Modal` di React Native — bukan `View` posisi absolute nut
 `Surface`/`Card` tetap dipakai **di dalam** `Dialog` untuk ngasih tampilan (background, shape, elevation) — karena `Dialog` sendiri cuma window kosong tanpa visual apa-apa.
 
 `Box` hanya cocok untuk overlay yang **bukan** modal sungguhan (tetap terbatas di bounds parent, misal tooltip kecil atau loading indicator yang nutupin sebagian konten).
+
+## 22. Garis bawah di `.value` (misal `buttonClickedState.value = !buttonClickedState.value`)
+
+Bukan error/warning — itu fitur **State Read/Write highlighting** di Android Studio untuk Compose. IDE mendeteksi `.value` adalah properti `State`/`MutableState` (dari `remember { mutableStateOf(...) }`):
+
+- Sisi yang **dibaca** (state read) → trigger recomposition kalau dipakai di composable lain.
+- Sisi yang **ditulis** (state write) → ini yang men-trigger recomposition.
+
+Sifatnya cuma informatif, bantu kamu paham bagian mana dari UI yang bakal recompose saat state berubah. Hover untuk lihat tooltip detailnya.
+
+## 23. Container putih tidak sampai tepi kanan (kasus nyata di `Portfolio()`)
+
+Diverifikasi langsung lewat emulator: kotak putih (background sebuah `Row`) berhenti sebelum tepi kanan, sisanya abu-abu.
+
+Penyebab:
+1. `Card` item sudah `.fillMaxWidth()` → lebar penuh, ini benar.
+2. `Row` di dalamnya **tidak** punya `.fillMaxWidth()` → cuma selebar isinya (avatar+teks), bukan selebar `Card`.
+3. `.background(MaterialTheme.colorScheme.surface)` di `Row` cuma mengecat seluas `Row` itu sendiri (sempit). Sisa area di kanan yang terlihat abu-abu adalah warna default `Card` sendiri (Material3 `Card` tanpa `colors=` custom defaultnya abu-abu muda, bukan putih).
+
+Fix: tambahkan `.fillMaxWidth()` di modifier `Row`, sebelum `.background()`.
+
+## 24. Urutan `fillMaxWidth()` vs `padding()` — kapan berpengaruh, kapan tidak
+
+`fillMaxWidth()` dan `padding()` itu sama-sama modifier **ukuran** (sizing) — urutan keduanya **terhadap satu sama lain** tidak mengubah hasil visual akhir, karena secara matematis efeknya saling membatalkan (padding mengurangi constraint yang diteruskan, tapi menambah balik jumlah yang sama saat melaporkan ukurannya ke parent).
+
+Yang **benar-benar berpengaruh**: posisi keduanya **relatif terhadap modifier yang "mengecat"** seperti `.background()` atau `.border()`. Aturannya cuma satu:
+
+> `fillMaxWidth()` harus ada **sebelum** `.background()` dalam chain, supaya `.background()` mengecat area yang sudah dilebarkan, bukan area asli yang masih wrap-content.
+
+## 25. Padding sebagai margin vs padding sungguhan — generalisasi (bukan soal "padding ke-1/ke-2")
+
+Aturan dari #2 dan #23 sebenarnya bukan soal **urutan penulisan ke berapa**, tapi soal **posisi relatif terhadap titik "mengecat"** (`.background()`/`.border()`):
+
+- Padding **sebelum** titik mengecat → jadi margin (area kosong, tidak ikut dicat).
+- Padding **sesudah** titik mengecat → jadi padding sungguhan (area di dalam cat, sebelum konten).
+
+Kalau nambah padding lagi, hasilnya tergantung di mana diselipkan — padding tambahan sebelum titik cat akan menumpuk jadi total margin yang lebih besar; padding tambahan sesudah titik cat menumpuk jadi total padding dalam yang lebih besar. Kalau ada **dua** `.background()` dengan padding di antaranya, itu jadi teknik bikin efek "cincin"/border warna (warna pertama nongol sebagai pinggiran warna kedua).
+
+## 26. Ada panduan/aturan resmi untuk tampilan yang rapi?
+
+Ada — berbasis spesifikasi **Material Design**, bukan cuma rasa estetika:
+
+- **m3.material.io** — spesifikasi resmi tiap komponen (Button, Card, TopAppBar, dst): padding internal, tinggi minimum, ukuran icon, jarak antar elemen dalam angka pasti.
+- **Grid 8dp** — konvensi luas (bukan cuma Material): semua nilai spacing/padding sebaiknya kelipatan 4dp/8dp (`4, 8, 12, 16, 24, 32, 48, 64`) supaya konsisten secara visual.
+- **Touch target minimum 48dp x 48dp** — untuk elemen yang bisa diklik (Button, IconButton), supaya nyaman disentuh jari. Ini alasan Compose `Button` punya minimum height bawaan.
+- **Typography scale & color roles** (lihat #13, #11) — memakai `MaterialTheme.typography.xxx` dan `MaterialTheme.colorScheme.xxx` (bukan hardcode) otomatis mengikuti aturan kontras dan skala ukuran yang sudah dirancang.
+- **Material Theme Builder** (`material-foundation.github.io/material-theme-builder`) — masukin 1 warna seed, otomatis generate seluruh `colorScheme` yang kontrasnya proporsional dan harmonis.
+- **Prinsip layout umum** (berlaku universal, bukan cuma Material):
+  - *Proximity*: elemen yang related dikasih spacing kecil, yang tidak related dikasih spacing lebih besar.
+  - *Hierarki visual*: ukuran/warna/ketebalan font dipakai untuk nunjukin mana yang paling penting.
+  - Hindari dua CTA setara berdampingan kalau bukan pasangan yang memang sengaja setara (biasanya satu primary/filled, satu secondary/outlined).
+  - Whitespace itu sengaja, bukan tanda "kurang konten".
